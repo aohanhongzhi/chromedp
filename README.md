@@ -92,3 +92,9 @@ to find out of the box.
 [goref-chromedp-status]: https://pkg.go.dev/badge/github.com/chromedp/chromedp.svg
 [release-status]: https://img.shields.io/github/v/release/chromedp/chromedp?display_name=tag&sort=semver (Latest Release)
 [releases]: https://github.com/chromedp/chromedp/releases (Releases)
+
+
+
+``
+git tag -v0.9.5.1
+``
