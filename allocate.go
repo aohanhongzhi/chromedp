@@ -124,6 +124,17 @@ type ExecAllocator struct {
 // temporary directory is used.
 var allocTempDir string
 
+func isChannelClosed(ch chan struct{}) bool {
+	select {
+	case _, ok := <-ch:
+		// 如果 ok 为 false，表示通道已关闭
+		return !ok
+	default:
+		// 没有数据可读取，通道可能仍然打开
+		return false
+	}
+}
+
 // Allocate satisfies the Allocator interface.
 func (a *ExecAllocator) Allocate(ctx context.Context, opts ...BrowserOption) (*Browser, error) {
 	c := FromContext(ctx)
@@ -168,7 +179,7 @@ func (a *ExecAllocator) Allocate(ctx context.Context, opts ...BrowserOption) (*B
 
 	// Force the first page to be blank, instead of the welcome page;
 	// --no-first-run doesn't enforce that.
-	args = append(args, "about:blank")
+	args = append(args, "https://wd.jtexpress.com.cn/indexSub")
 
 	cmd := exec.CommandContext(ctx, a.execPath, args...)
 	defer func() {
@@ -215,6 +226,12 @@ func (a *ExecAllocator) Allocate(ctx context.Context, opts ...BrowserOption) (*B
 		a.wg.Add(1) // for the io.Copy in a separate goroutine
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// 捕获 panic 并记录日志
+				println("Attempted to close an already closed channel")
+			}
+		}()
 		// First wait for the process to be finished.
 		// TODO: do we care about this error in any scenario? if the
 		// user cancelled the context and killed chrome, this will most
@@ -233,13 +250,21 @@ func (a *ExecAllocator) Allocate(ctx context.Context, opts ...BrowserOption) (*B
 			}
 		}
 		a.wg.Done()
-		close(c.allocated)
+
+		if !isChannelClosed(c.allocated) {
+			close(c.allocated)
+		}
 	}()
 
 	var wsURL string
 	wsURLChan := make(chan struct{}, 1)
 	go func() {
 		wsURL, err = readOutput(stdout, a.combinedOutputWriter, a.wg.Done)
+		//  尝试直接写在user-data下面。
+		err1 := os.WriteFile(filepath.Join(dataDir, "url.txt"), []byte(wsURL), 0644)
+		if err1 != nil {
+			println(err1)
+		}
 		wsURLChan <- struct{}{}
 	}()
 	select {
