@@ -597,7 +597,9 @@ func (a *RemoteAllocator) Allocate(ctx context.Context, opts ...BrowserOption) (
 	// closing the relevant pages before closing the websocket connection.
 	wctx, cancel := context.WithCancel(context.Background())
 
-	close(c.allocated)
+	if !isChannelClosed(c.allocated) {
+		close(c.allocated)
+	}
 	a.wg.Add(1) // for the entire allocator
 	go func() {
 		<-ctx.Done()
